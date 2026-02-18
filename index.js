@@ -1,63 +1,43 @@
-// index.js
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
 const app = express();
-const port = process.env.PORT || 5000;
-
-// Enable CORS so frontend can access this API
 app.use(cors());
-app.use(bodyParser.text({ type: "*/*" }));
+app.use(bodyParser.text({ type: "text/plain" }));
 
-// Simple Luau obfuscator function
-let variableCounter = 0;
-
-function getNewVarName() {
-  variableCounter += 1;
-  return `v${variableCounter}`;
-}
+let varCounter = 0;
 
 function obfuscateLuau(script) {
-  variableCounter = 0;
+  varCounter = 0;
   const variableMap = {};
-
+  
   // Remove comments
-  script = script.replace(/--.*/g, "");
-  // Normalize whitespace
-  script = script.replace(/\s+/g, " ");
-
+  script = script.replace(/--.*$/gm, "");
+  
+  // Find variable names (simple version)
   const tokens = script.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+  const skipGlobals = new Set(["print", "workspace", "game", "Enum", "math", "table", "string", "Instance"]);
 
-  const skipGlobals = new Set([
-    "print", "workspace", "game", "Enum",
-    "math", "table", "string", "Instance"
-  ]);
-
-  for (const token of tokens) {
+  tokens.forEach(token => {
     if (!variableMap[token] && !skipGlobals.has(token)) {
-      variableMap[token] = getNewVarName();
+      varCounter++;
+      variableMap[token] = `v${varCounter}`;
     }
-  }
+  });
 
-  return script.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, (tk) => variableMap[tk] || tk);
+  // Replace variable names only
+  return script.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, m => variableMap[m] || m);
 }
 
-// Obfuscate endpoint
 app.post("/obfuscate", (req, res) => {
-  if (!req.body) {
-    return res.status(400).send("No script provided");
-  }
-  const luaScript = req.body;
-  const obfuscated = obfuscateLuau(luaScript);
+  const script = req.body;
+  if (!script) return res.status(400).send("No script provided");
+
+  const obfuscated = obfuscateLuau(script);
   res.send(obfuscated);
 });
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Luau Obfuscator Backend is running");
-});
+app.get("/", (req, res) => res.send("Luau Obfuscator Backend is running"));
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+app.listen(process.env.PORT || 5000, () => console.log("Server running"));
