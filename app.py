@@ -1,9 +1,9 @@
 from flask import Flask, request
-from flask_cors import CORS  # << add this
+from flask_cors import CORS
 import re
 
 app = Flask(__name__)
-CORS(app)  # << allow requests from any origin
+CORS(app)  # <-- This allows all origins
 
 variable_map = {}
 var_counter = 0
