@@ -1,15 +1,25 @@
+// index.js
 const express = require("express");
 const bodyParser = require("body-parser");
+const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const port = process.env.PORT || 5000;
 
-// Middleware to parse raw text
+// Enable CORS so frontend can access this API
+app.use(cors());
 app.use(bodyParser.text({ type: "*/*" }));
 
-// Simple Luau obfuscation function
+// Simple Luau obfuscator function
+let variableCounter = 0;
+
+function getNewVarName() {
+  variableCounter += 1;
+  return `v${variableCounter}`;
+}
+
 function obfuscateLuau(script) {
-  let varCounter = 0;
+  variableCounter = 0;
   const variableMap = {};
 
   // Remove comments
@@ -17,7 +27,6 @@ function obfuscateLuau(script) {
   // Normalize whitespace
   script = script.replace(/\s+/g, " ");
 
-  // Find all variable-like tokens
   const tokens = script.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
 
   const skipGlobals = new Set([
@@ -25,32 +34,30 @@ function obfuscateLuau(script) {
     "math", "table", "string", "Instance"
   ]);
 
-  tokens.forEach(token => {
+  for (const token of tokens) {
     if (!variableMap[token] && !skipGlobals.has(token)) {
-      varCounter++;
-      variableMap[token] = `v${varCounter}`;
+      variableMap[token] = getNewVarName();
     }
-  });
-
-  return script.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, match => variableMap[match] || match);
-}
-
-// Routes
-app.post("/obfuscate", (req, res) => {
-  const luaScript = req.body;
-  if (!luaScript || !luaScript.trim()) {
-    return res.status(400).send("No script provided");
   }
 
+  return script.replace(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, (tk) => variableMap[tk] || tk);
+}
+
+// Obfuscate endpoint
+app.post("/obfuscate", (req, res) => {
+  if (!req.body) {
+    return res.status(400).send("No script provided");
+  }
+  const luaScript = req.body;
   const obfuscated = obfuscateLuau(luaScript);
   res.send(obfuscated);
 });
 
+// Health check
 app.get("/", (req, res) => {
   res.send("Luau Obfuscator Backend is running");
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
